@@ -610,6 +610,13 @@ Useful for further Tedana processing post-NiBabies.""",
         help='Path to existing FreeSurfer subjects directory to reuse. '
         '(default: OUTPUT_DIR/freesurfer)',
     )
+    g_fs.add_argument(
+        '--mcribs-dir',
+        metavar='PATH',
+        type=Path,
+        help='Path to existing MCRIB-S subjects directory to reuse. '
+        '(default: OUTPUT_DIR/mcribs)',
+    )
 
     # Surface generation xor
     g_surfs = parser.add_argument_group('Surface preprocessing options')
@@ -895,17 +902,18 @@ applied."""
                 pass
 
     if config.workflow.surface_recon_method == 'mcribs':
-        match output_layout:
-            case 'bids':
-                config.execution.mcribs_dir = output_dir / 'sourcedata' / 'mcribs'
-            case 'legacy':
-                config.execution.mcribs_dir = output_dir / 'mcribs'
-            case 'multiverse':
-                config.execution.mcribs_dir = (
-                    nibabies_dir / 'sourcedata' / f'mcribs-{config.execution.parameters_hash}'
-                )
-            case _:
-                pass
+        if config.execution.mcribs_dir is None:
+            match output_layout:
+                case 'bids':
+                    config.execution.mcribs_dir = output_dir / 'sourcedata' / 'mcribs'
+                case 'legacy':
+                    config.execution.mcribs_dir = output_dir / 'mcribs'
+                case 'multiverse':
+                    config.execution.mcribs_dir = (
+                        nibabies_dir / 'sourcedata' / f'mcribs-{config.execution.parameters_hash}'
+                    )
+                case _:
+                    pass
         # Ensure the directory is created
         config.execution.mcribs_dir.mkdir(exist_ok=True, parents=True)
 
