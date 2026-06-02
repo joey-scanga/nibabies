@@ -614,8 +614,8 @@ Useful for further Tedana processing post-NiBabies.""",
         '--mcribs-dir',
         metavar='PATH',
         type=Path,
-        help='Path to existing MCRIB-S subjects directory to reuse. '
-        '(default: OUTPUT_DIR/mcribs)',
+        help='Path to existing MCRIB-S subjects directory to reuse '
+        'if `--surface-recon-method mcribs` is enabled (default: OUTPUT_DIR/mcribs).',
     )
 
     # Surface generation xor
