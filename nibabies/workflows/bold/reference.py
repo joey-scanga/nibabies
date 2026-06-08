@@ -143,7 +143,7 @@ using a custom methodology of *NiBabies*, for use in head motion correction.
         from nipype.interfaces.fsl import MCFLIRT
 
         mcflirt = pe.Node(MCFLIRT(), name='mcflirt', mem_gb=1)
-        mcflirt.inputs.cost = "normcorr"
+        mcflirt.inputs.cost = 'leastsquares'
         mcflirt.inputs.save_rms = True
 
         get_lowest_motion_frame = pe.Node(
@@ -193,9 +193,16 @@ def _get_lowest_motion_frame(
     rms_files: str
 ) -> list[bool]:
     import numpy as np
-    abs_motion, rel_motion = np.loadtxt(rms_files[0]), np.loadtxt(rms_files[1])
-    lowest_motion_frames = np.argsort(rel_motion)[:5] + 1  # rel_motion short of BOLD length by 1 frame
-    t_mask = [False] * abs_motion.shape[0]
+    rel_motion = np.loadtxt(rms_files[1])
+    lowest_mean = np.inf
+    lowest_idx = None
+    for i in range(15, rel_motion.shape[0] - 2):  # start at frame 15
+        mean = np.mean(rel_motion[i - 2:i + 3])
+        if mean < lowest_mean:
+            lowest_mean = mean
+            lowest_idx = i
+    lowest_motion_frames = np.array(range(lowest_idx - 2, lowest_idx + 3)) + 1
+    t_mask = [False] * (rel_motion.shape[0] + 1)
     for idx in lowest_motion_frames:
         t_mask[idx] = True
     return t_mask
