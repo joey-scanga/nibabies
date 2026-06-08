@@ -143,7 +143,7 @@ using a custom methodology of *NiBabies*, for use in head motion correction.
         from nipype.interfaces.fsl import MCFLIRT
 
         mcflirt = pe.Node(MCFLIRT(), name='mcflirt', mem_gb=1)
-        mcflirt.inputs.cost = 'leastsquares'
+        mcflirt.inputs.cost = 'corratio'
         mcflirt.inputs.save_rms = True
 
         get_lowest_motion_frame = pe.Node(
