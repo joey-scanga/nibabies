@@ -51,7 +51,7 @@ RUN pixi config set --global run-post-link-scripts insecure
 
 # Install dependencies before the package itself to leverage caching
 RUN mkdir /app
-COPY pixi.lock pyproject.toml /app
+COPY pixi.lock pyproject.toml /app/
 WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/rattler pixi install -e nibabies ${PIXI_LOCK_FLAGS} --skip nibabies
 RUN --mount=type=cache,target=/root/.npm pixi run --as-is -e nibabies npm install -g svgo@^3.2.0 bids-validator@1.14.10
