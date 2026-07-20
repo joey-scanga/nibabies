@@ -24,6 +24,7 @@
 
 # Ubuntu 22.04 LTS - Jammy
 ARG BASE_IMAGE=ubuntu:jammy-20240405
+ARG PIXI_LOCK_FLAGS=--frozen
 
 #
 # Build pixi environment
@@ -39,6 +40,7 @@ ARG BASE_IMAGE=ubuntu:jammy-20240405
 #   - ...
 #
 FROM ghcr.io/prefix-dev/pixi:0.70.0 AS build
+ARG PIXI_LOCK_FLAGS=--frozen
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
                     ca-certificates \
@@ -51,14 +53,14 @@ RUN pixi config set --global run-post-link-scripts insecure
 RUN mkdir /app
 COPY pixi.lock pyproject.toml /app
 WORKDIR /app
-RUN --mount=type=cache,target=/root/.cache/rattler pixi install -e nibabies --frozen --skip nibabies
+RUN --mount=type=cache,target=/root/.cache/rattler pixi install -e nibabies ${PIXI_LOCK_FLAGS} --skip nibabies
 RUN --mount=type=cache,target=/root/.npm pixi run --as-is -e nibabies npm install -g svgo@^3.2.0 bids-validator@1.14.10
 # Note that PATH gets hard-coded. Remove it and re-apply in final image
 RUN pixi shell-hook -e nibabies --as-is | grep -v PATH > /shell-hook.sh
 
 # Finally, install the package
 COPY . /app
-RUN --mount=type=cache,target=/root/.cache/rattler pixi install -e nibabies --frozen
+RUN --mount=type=cache,target=/root/.cache/rattler pixi install -e nibabies ${PIXI_LOCK_FLAGS}
 
 # Older Python to support legacy MCRIBS
 FROM python:3.6.15-slim AS pyenv

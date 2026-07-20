@@ -73,6 +73,9 @@ maint = [
     "fuzzywuzzy",
     "python-Levenshtein",
 ]
+warpkit = [
+  "warpkit >= 1.2.1 ; python_version >= '3.11'",
+]
 test = [
     "coverage[toml]",
     "pytest",
@@ -84,7 +87,7 @@ telemetry = ["migas >= 0.4.0"]
 # Aliases
 docs = ["nibabies[doc]"]
 tests = ["nibabies[test]"]
-all = ["nibabies[dev,doc,maint,telemetry,test]"]
+all = ["nibabies[dev,doc,maint,telemetry,test,warpkit]"]
 
 [project.scripts]
 nibabies = "nibabies.cli.run:main"
@@ -120,12 +123,12 @@ FSLDIR = "$CONDA_PREFIX"
 [tool.pixi.environments]
 # Local installs will use editable
 default = { features = ["editable"], solve-group = "default" }
-test = { features = ["editable", "test"], solve-group = "default" }
+test = { features = ["editable", "test", "warpkit"], solve-group = "default" }
 # Use "nibabies" feature for production environment, so it is identifiable.
 # Includes "test" because the shipped image runs pytest in-container (CircleCI uses
 # `docker run --entrypoint=pytest nibabies:dev`); fMRIPrep instead ships a separate
 # test image. Revisit if/when nibabies splits a dedicated test image.
-nibabies = { features = ["production", "container", "telemetry", "test"], solve-group = "production" }
+nibabies = { features = ["production", "container", "telemetry", "test", "warpkit"], solve-group = "production" }
 
 [tool.pixi.feature.editable.pypi-dependencies]
 nibabies = { path = ".", editable = true }
