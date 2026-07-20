@@ -60,7 +60,7 @@ from smriprep.workflows.outputs import init_template_iterator_wf
 from nibabies import config
 from nibabies.interfaces import DerivativesDataSink
 from nibabies.interfaces.reports import AboutSummary, FunctionalSummary, SubjectSummary
-from nibabies.utils.bids import extract_entities, parse_bids_for_age_months
+from nibabies.utils.bids import extract_entities, parse_bids_for_age_months, select_bold_magnitude_files
 from nibabies.workflows.anatomical.apply import init_infant_anat_apply_wf
 from nibabies.workflows.anatomical.fit import (
     init_infant_anat_fit_wf,
@@ -310,11 +310,19 @@ It is released under the [CC0]\
 
     bold_runs = [
         sorted(
-            listify(run),
+            select_bold_magnitude_files(listify(run)),
             key=lambda fl: config.execution.layout.get_metadata(fl).get('EchoTime', 0),
         )
         for run in subject_data['bold']
     ]
+    bold_runs = [run for run in bold_runs if run]
+
+    if not anat_only and not bold_runs:
+        task_id = config.execution.task_id or '<all>'
+        raise RuntimeError(
+            f'No magnitude BOLD images found for participant {subject_id} and '
+            f'task {task_id}. All workflows require BOLD images.'
+        )
 
     if subject_data['roi']:
         warnings.warn(
@@ -611,10 +619,13 @@ It is released under the [CC0]\
     if config.workflow.anat_only:
         return clean_datasinks(workflow)
 
+    fieldmap_bold_runs = [
+        run for run in bold_runs if not (config.workflow.me_use_warpkit and len(run) > 1)
+    ]
     fmap_estimators, estimator_map = map_fieldmap_estimation(
         layout=config.execution.layout,
         subject_id=subject_id,
-        bold_data=bold_runs,
+        bold_data=fieldmap_bold_runs,
         ignore_fieldmaps='fieldmaps' in config.workflow.ignore,
         use_syn=config.workflow.use_syn_sdc,
         force_syn=config.workflow.force_syn,
@@ -762,7 +773,8 @@ tasks and sessions), the following preprocessing was performed.
             from nibabies.utils.derivatives import collect_functional_derivatives
 
             entities = extract_entities(bold_series)
-            fieldmap_id = estimator_map.get(bold_series[0])
+            use_warpkit = config.workflow.me_use_warpkit and len(bold_series) > 1
+            fieldmap_id = None if use_warpkit else estimator_map.get(bold_series[0])
             for deriv_dir in config.execution.derivatives.values():
                 cache.update(
                     collect_functional_derivatives(
@@ -893,9 +905,13 @@ tasks and sessions), the following preprocessing was performed.
             run_without_submitting=True,
         )
 
+        warpkit_enabled = config.workflow.me_use_warpkit and metadata.get('EchoTime', 0)
+
         func_fit_reports_wf = init_func_fit_reports_wf(
             reference_anat=reference_anat,
-            sdc_correction=fieldmap_id is not None,
+            sdc_correction=fieldmap_id is not None or warpkit_enabled,
+            fieldmap_registration=fieldmap_id is not None and not warpkit_enabled,
+            fieldmap_reportlet=warpkit_enabled,
             output_dir=config.execution.output_dir,
             name=f'func_fit_reports_{bold_id}_wf',
         )
@@ -1019,6 +1035,7 @@ tasks and sessions), the following preprocessing was performed.
         bold_apply_wf = init_bold_apply_wf(
             bold_series=bold_series,
             fieldmap_id=fieldmap_id,
+            use_warpkit=use_warpkit,
             spaces=spaces,
             reference_anat=reference_anat,
             name=f'bold_apply_{bold_id}_wf',
@@ -1045,6 +1062,7 @@ tasks and sessions), the following preprocessing was performed.
                 ('outputnode.motion_xfm', 'inputnode.motion_xfm'),
                 ('outputnode.run2fmap_xfm', 'inputnode.run2fmap_xfm'),
                 ('outputnode.dummy_scans', 'inputnode.dummy_scans'),
+                ('outputnode.fieldmap', 'inputnode.fieldmap'),
             ]),
             (boldref_buffer, bold_apply_wf, [
                 ('boldref2anat_xfm', 'inputnode.boldref2anat_xfm'),

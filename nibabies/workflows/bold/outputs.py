@@ -35,6 +35,7 @@ from nibabies._types import Anatomical
 from nibabies.config import DEFAULT_DISMISS_ENTITIES, DEFAULT_MEMORY_MIN_GB, dismiss_entities
 from nibabies.interfaces import DerivativesDataSink
 from nibabies.interfaces.bids import BIDSURI
+from nibabies.utils.bids import dismiss_echo
 
 
 def prepare_timing_parameters(metadata: dict):
@@ -143,6 +144,8 @@ def init_func_fit_reports_wf(
     *,
     reference_anat: Anatomical,
     sdc_correction: bool,
+    fieldmap_registration: bool,
+    fieldmap_reportlet: bool,
     output_dir: str,
     name='func_fit_reports_wf',
 ) -> pe.Workflow:
@@ -324,7 +327,7 @@ def init_func_fit_reports_wf(
     #       Before: anat brain with white matter mask
     #       After: Resampled boldref with white matter mask
 
-    if sdc_correction:
+    if fieldmap_registration:
         to_fmap_xfm = pe.Node(
             niu.Merge(2),
             name='to_fmap_xfm',
@@ -366,6 +369,60 @@ def init_func_fit_reports_wf(
             name='ds_sdcreg_report',
         )
 
+        workflow.connect([
+            (inputnode, fmapref_boldref, [
+                ('fmap_ref', 'input_image'),
+                ('coreg_boldref', 'reference_image'),
+            ]),
+            (inputnode, to_fmap_xfm, [
+                ('run2fmap_xfm', 'in1'),
+                ('run2boldref_xfm', 'in2'),
+            ]),
+            (to_fmap_xfm, fmapref_boldref, [
+                ('out', 'transforms'),
+            ]),
+            (inputnode, sdcreg_report, [
+                ('sdc_boldref', 'reference'),
+                ('fieldmap', 'fieldmap'),
+                ('bold_mask', 'mask'),
+            ]),
+            (fmapref_boldref, sdcreg_report, [('output_image', 'moving')]),
+            (inputnode, ds_sdcreg_report, [('source_file', 'source_file')]),
+            (sdcreg_report, ds_sdcreg_report, [('out_report', 'in_file')]),
+        ])  # fmt:skip
+
+    if fieldmap_reportlet:
+        fieldmap_report = pe.Node(
+            FieldmapReportlet(
+                reference_label='Distorted BOLD reference',
+                show=0,
+            ),
+            name='fieldmap_report',
+            mem_gb=0.1,
+        )
+
+        ds_fieldmap_report = pe.Node(
+            DerivativesDataSink(
+                base_directory=output_dir,
+                desc='fieldmap',
+                suffix='bold',
+                datatype='figures',
+                dismiss_entities=dismiss_echo(),
+            ),
+            name='ds_fieldmap_report',
+        )
+
+        workflow.connect([
+            (inputnode, fieldmap_report, [
+                ('bold_mask', 'mask'),
+                ('sdc_boldref', 'reference'),
+                ('fieldmap', 'fieldmap'),
+            ]),
+            (inputnode, ds_fieldmap_report, [('source_file', 'source_file')]),
+            (fieldmap_report, ds_fieldmap_report, [('out_report', 'in_file')]),
+        ])  # fmt:skip
+
+    if sdc_correction:
         # SDC2
         sdc_report = pe.Node(
             SimpleBeforeAfter(
@@ -387,27 +444,7 @@ def init_func_fit_reports_wf(
             ),
             name='ds_sdc_report',
         )
-
         workflow.connect([
-            (inputnode, fmapref_boldref, [
-                ('fmap_ref', 'input_image'),
-                ('coreg_boldref', 'reference_image'),
-            ]),
-            (inputnode, to_fmap_xfm, [
-                ('run2fmap_xfm', 'in1'),
-                ('run2boldref_xfm', 'in2'),
-            ]),
-            (to_fmap_xfm, fmapref_boldref, [
-                ('out', 'transforms'),
-            ]),
-            (inputnode, sdcreg_report, [
-                ('sdc_boldref', 'reference'),
-                ('fieldmap', 'fieldmap'),
-                ('bold_mask', 'mask'),
-            ]),
-            (fmapref_boldref, sdcreg_report, [('output_image', 'moving')]),
-            (inputnode, ds_sdcreg_report, [('source_file', 'source_file')]),
-            (sdcreg_report, ds_sdcreg_report, [('out_report', 'in_file')]),
             (inputnode, sdc_report, [
                 ('sdc_boldref', 'before'),
                 ('coreg_boldref', 'after'),
@@ -415,7 +452,7 @@ def init_func_fit_reports_wf(
             (boldref_wm, sdc_report, [('output_image', 'wm_seg')]),
             (inputnode, ds_sdc_report, [('source_file', 'source_file')]),
             (sdc_report, ds_sdc_report, [('out_report', 'in_file')]),
-        ])  # fmt:skip
+        ])
 
     # EPI-anat registration
     # Resample anat image onto EPI-space

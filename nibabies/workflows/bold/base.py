@@ -65,6 +65,7 @@ def init_bold_apply_wf(
     reference_anat: Anatomical,
     bold_series: list[str],
     fieldmap_id: str | None = None,
+    use_warpkit: bool = False,
     spaces: 'SpatialReferences',
     name: str = 'bold_apply_wf',
 ) -> pe.Workflow:
@@ -97,6 +98,8 @@ def init_bold_apply_wf(
     fieldmap_id
         ID of the fieldmap to use to correct this BOLD series. If :obj:`None`,
         no correction will be applied.
+    use_warpkit
+        Use warpkit MEDIC for compatible multi-echo BOLD runs.
 
     Inputs
     ------
@@ -210,6 +213,7 @@ def init_bold_apply_wf(
                 # Fieldmap registration
                 'fmap_ref',
                 'fmap_coeff',
+                'fieldmap',
                 # Volumetric templates
                 'anat2std_xfm',
                 'std_t1w',
@@ -241,6 +245,7 @@ def init_bold_apply_wf(
     bold_native_wf = init_bold_native_wf(
         bold_series=bold_series,
         fieldmap_id=fieldmap_id,
+        use_warpkit=use_warpkit,
         omp_nthreads=omp_nthreads,
     )
 
@@ -248,6 +253,7 @@ def init_bold_apply_wf(
         (inputnode, bold_native_wf, [
             ('fmap_ref', 'inputnode.fmap_ref'),
             ('fmap_coeff', 'inputnode.fmap_coeff'),
+            ('fieldmap', 'inputnode.fieldmap'),
             ('run_boldref', 'inputnode.run_boldref'),
             ('bold_mask', 'inputnode.bold_mask'),
             ('motion_xfm', 'inputnode.motion_xfm'),
@@ -290,6 +296,7 @@ def init_bold_apply_wf(
         bold_boldref_wf = init_bold_boldref_wf(
             bold_series=bold_series,
             fieldmap_id=fieldmap_id,
+            use_warpkit=use_warpkit,
             omp_nthreads=omp_nthreads,
         )
         workflow.connect([
@@ -299,6 +306,7 @@ def init_bold_apply_wf(
                 ('run2fmap_xfm', 'inputnode.run2fmap_xfm'),
                 ('fmap_ref', 'inputnode.fmap_ref'),
                 ('fmap_coeff', 'inputnode.fmap_coeff'),
+                ('fieldmap', 'inputnode.fieldmap'),
             ]),
             (bold_native_wf, bold_boldref_wf, [
                 ('outputnode.bold_minimal', 'inputnode.bold_minimal'),
