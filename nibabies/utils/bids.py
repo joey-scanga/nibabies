@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from ..config import config
+
 SUPPORTED_AGE_UNITS = (
     'weeks',
     'months',
@@ -462,3 +464,15 @@ def collect_bold_part_files(layout, bold_series, part):
         layout.get(return_type='file', **entities),
         key=lambda fname: layout.get_metadata(fname).get('EchoTime', 0),
     )
+
+
+def dismiss_echo(entities=None):
+    """Set entities to dismiss in a DerivativesDataSink."""
+    if entities is None:
+        entities = []
+
+    echo_idx = config.execution.echo_idx
+    if echo_idx is None or len(listify(echo_idx)) > 2:
+        entities.append('echo')
+
+    return entities
