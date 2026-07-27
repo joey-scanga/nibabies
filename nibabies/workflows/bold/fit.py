@@ -805,6 +805,7 @@ def init_bold_native_wf(
                 # Fieldmap fit
                 'fmap_ref',
                 'fmap_coeff',
+                'fieldmap'
             ],
         ),
         name='inputnode',
