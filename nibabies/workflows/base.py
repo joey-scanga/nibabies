@@ -851,6 +851,7 @@ tasks and sessions), the following preprocessing was performed.
         bold_file = bold_series[0]
         entities = extract_entities(bold_series)
         metadata = config.execution.layout.get_metadata(bold_file)
+        use_warpkit = config.workflow.me_use_warpkit and len(bold_series) > 1
         fieldmap_id = estimator_map.get(bold_file)
 
         bold_id = _get_wf_name(bold_file, None).removesuffix('_wf')
@@ -862,6 +863,7 @@ tasks and sessions), the following preprocessing was performed.
             bold_series=bold_series,
             precomputed=functional_cache,
             fieldmap_id=fieldmap_id,
+            use_warpkit=use_warpkit,
             omp_nthreads=omp_nthreads,
             name=f'bold_fit_{bold_id}_wf',
         )
