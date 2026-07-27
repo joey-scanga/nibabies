@@ -229,12 +229,12 @@ def init_bold_fit_wf(
                 f'{len(bold_series)} echo(es)).'
             )
 
-        try:
-            tes_ms = float(metadata['EchoTime']) * 1000
-        except KeyError as exc:
-            raise RuntimeError(
-                f'warpkit MEDIC requires EchoTime metadata for every echo of <{bold_file}>.'
-            ) from exc
+        # try:
+        #     tes_ms = float(metadata['EchoTime']) * 1000
+        # except KeyError as exc:
+        #     raise RuntimeError(
+        #         f'warpkit MEDIC requires EchoTime metadata for every echo of <{bold_file}>.'
+        #     ) from exc
 
         # `bold_series` and `phase_files` are independently sorted by EchoTime
         # (in workflows/base.py and collect_bold_part_files respectively). A
@@ -244,6 +244,9 @@ def init_bold_fit_wf(
         if layout is None:
             raise RuntimeError('warpkit MEDIC requires a BIDSLayout.')
 
+        tes_ms = [
+            float(layout.get_metadata(p).get('EchoTime', 0.0)) * 1000 for p in bold_series
+        ]
         phase_tes_ms = [
             float(layout.get_metadata(p).get('EchoTime', 0.0)) * 1000 for p in phase_files
         ]
