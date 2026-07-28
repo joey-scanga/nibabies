@@ -22,6 +22,7 @@
 #
 from nipype.interfaces import utility as niu
 from nipype.pipeline import engine as pe
+from nipype.interfaces.fsl import MCFLIRT
 from niworkflows.engine.workflows import LiterateWorkflow as Workflow
 from niworkflows.interfaces.header import ValidateImage
 from niworkflows.utils.misc import pass_dummy_scans
@@ -126,8 +127,19 @@ using a custom methodology of *NiBabies*, for use in head motion correction.
     )
     select_frames.inputs.ref_frame_start = ref_frame_start
 
+    get_lowest_motion_frame = pe.Node(
+        niu.Function(
+            function=_get_lowest_motion_frame,
+            input_names=["rms_files"],
+            output_names=["t_mask"]
+        ),
+        name="get_lowest_motion_frame"
+    )
+    mcflirt = pe.Node(MCFLIRT(), name='mcflirt', mem_gb=1)
+    mcflirt.inputs.cost = "normcorr"
+    mcflirt.inputs.save_rms = True
     get_dummy = pe.Node(NonsteadyStatesDetector(), name='get_dummy')
-    gen_avg = pe.Node(RobustAverage(), name='gen_avg', mem_gb=1)
+    gen_avg = pe.Node(RobustAverage(mc_method='FSL'), name='gen_avg', mem_gb=1)
 
     calc_dummy_scans = pe.Node(
         niu.Function(function=pass_dummy_scans, output_names=['skip_vols_num']),
@@ -139,16 +151,14 @@ using a custom methodology of *NiBabies*, for use in head motion correction.
     workflow.connect([
         (inputnode, val_bold, [('bold_file', 'in_file')]),
         (inputnode, get_dummy, [('bold_file', 'in_file')]),
-        (inputnode, calc_dummy_scans, [('dummy_scans', 'dummy_scans')]),
-        (val_bold, gen_avg, [('out_file', 'in_file')]),
-        (val_bold, select_frames, [('out_file', 'in_file')]),
-        (inputnode, select_frames, [('dummy_scans', 'dummy_scans')]),
-        (select_frames, gen_avg, [('t_mask', 't_mask')]),
         (get_dummy, calc_dummy_scans, [('n_dummy', 'algo_dummy_scans')]),
-        (val_bold, outputnode, [
-            ('out_file', 'bold_file'),
-            ('out_report', 'validation_report'),
-        ]),
+        (inputnode, calc_dummy_scans, [('dummy_scans', 'dummy_scans')]),
+        (val_bold, mcflirt, [('out_file', 'in_file')]),
+        (val_bold, gen_avg, [('out_file', 'in_file')]),
+        (mcflirt, get_lowest_motion_frame, [('rms_files', 'rms_files')]),
+        (get_lowest_motion_frame, gen_avg, [('t_mask', 't_mask')]),
+        (mcflirt, outputnode, [('out_file', 'bold_file')]),
+        (val_bold, outputnode, [('out_report', 'validation_report')]),
         (calc_dummy_scans, outputnode, [('skip_vols_num', 'skip_vols')]),
         (gen_avg, outputnode, [('out_file', 'boldref')]),
         (get_dummy, outputnode, [('n_dummy', 'algo_dummy_scans')]),
@@ -183,3 +193,15 @@ def _select_frames(
     t_mask = np.array([False] * img_len, dtype=bool)
     t_mask[start_frame:] = True
     return start_frame, list(t_mask)
+
+
+def _get_lowest_motion_frame(
+    rms_files: str
+) -> list[bool]:
+    import numpy as np
+    abs_motion, rel_motion = np.loadtxt(rms_files[0]), np.loadtxt(rms_files[1])
+    lowest_motion_frames = np.argsort(rel_motion)[:5] + 1  # rel_motion short of BOLD length by 1 frame
+    t_mask = [False] * abs_motion.shape[0]
+    for idx in lowest_motion_frames:
+        t_mask[idx] = True
+    return t_mask
