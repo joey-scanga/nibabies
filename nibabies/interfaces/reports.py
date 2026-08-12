@@ -277,13 +277,17 @@ class FunctionalSummary(SummaryInterface):
         # TODO: Add a note about registration_init below?
         reg = {
             'FSL': [
-                'FSL <code>flirt</code> with boundary-based registration'
-                f' (BBR) metric - {dof} dof',
+                (
+                    'FSL <code>flirt</code> with boundary-based registration'
+                    f' (BBR) metric - {dof} dof'
+                ),
                 'FSL <code>flirt</code> rigid registration - 6 dof',
             ],
             'FreeSurfer': [
-                'FreeSurfer <code>bbregister</code> '
-                f'(boundary-based registration, BBR) - {dof} dof',
+                (
+                    'FreeSurfer <code>bbregister</code> '
+                    f'(boundary-based registration, BBR) - {dof} dof'
+                ),
                 f'FreeSurfer <code>mri_coreg</code> - {dof} dof',
             ],
         }[self.inputs.registration][self.inputs.fallback]
@@ -292,15 +296,19 @@ class FunctionalSummary(SummaryInterface):
 
         dummy_scan_tmp = '{n_dum}'
         if self.inputs.dummy_scans == self.inputs.algo_dummy_scans:
-            dummy_scan_msg = ' '.join(
-                [dummy_scan_tmp, '(Confirmed: {n_alg} automatically detected)']
-            ).format(n_dum=self.inputs.dummy_scans, n_alg=self.inputs.algo_dummy_scans)
+            dummy_scan_msg = (
+                f'{dummy_scan_tmp} (Confirmed: {{n_alg}} automatically detected)'.format(
+                    n_dum=self.inputs.dummy_scans, n_alg=self.inputs.algo_dummy_scans
+                )
+            )
         # the number of dummy scans was specified by the user and
         # it is not equal to the number detected by the algorithm
         elif self.inputs.dummy_scans is not None:
-            dummy_scan_msg = ' '.join(
-                [dummy_scan_tmp, '(Warning: {n_alg} automatically detected)']
-            ).format(n_dum=self.inputs.dummy_scans, n_alg=self.inputs.algo_dummy_scans)
+            dummy_scan_msg = (
+                f'{dummy_scan_tmp} (Warning: {{n_alg}} automatically detected)'.format(
+                    n_dum=self.inputs.dummy_scans, n_alg=self.inputs.algo_dummy_scans
+                )
+            )
         # the number of dummy scans was not specified by the user
         else:
             dummy_scan_msg = dummy_scan_tmp.format(n_dum=self.inputs.algo_dummy_scans)
@@ -407,3 +415,41 @@ def get_world_pedir(ornt, pe_direction):
         f'Orientation: {ornt}; PE dir: {pe_direction}'
     )
     return 'Could not be determined - assuming Anterior-Posterior'
+
+
+class _CiftiSurfacesPlotInputSpec(BaseInterfaceInputSpec):
+    in_file = File(exists=True, mandatory=True, desc='CIFTI dense timeseries (.dtseries.nii)')
+    surface_type = traits.Enum(
+        'inflated',
+        'midthickness',
+        'veryinflated',
+        usedefault=True,
+        desc='inflation level of the fsLR mesh used for rendering',
+    )
+
+
+class _CiftiSurfacesPlotOutputSpec(TraitedSpec):
+    out_report = File(exists=True, desc='the output SVG reportlet')
+
+
+class CiftiSurfacesPlot(SimpleInterface):
+    """
+    Render the mean BOLD of a CIFTI dense timeseries on the fsLR surfaces (QC).
+
+    TODO: port this interface to ``nireports``
+    """
+
+    input_spec = _CiftiSurfacesPlotInputSpec
+    output_spec = _CiftiSurfacesPlotOutputSpec
+
+    def _run_interface(self, runtime):
+        from nireports.reportlets.surface import cifti_surfaces_plot
+
+        out_report = str(Path(runtime.cwd) / 'cifti_surfaces.svg')
+        cifti_surfaces_plot(
+            self.inputs.in_file,
+            surface_type=self.inputs.surface_type,
+            output_file=out_report,
+        )
+        self._results['out_report'] = out_report
+        return runtime

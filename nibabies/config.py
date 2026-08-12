@@ -296,7 +296,7 @@ class nipype(_Config):
     """Number of CPUs a single process can access for multithreaded execution."""
     plugin = 'MultiProc'
     """NiPype's execution plugin."""
-    plugin_args = {
+    plugin_args: ty.ClassVar[dict] = {
         'maxtasksperchild': 1,
         'raise_insufficient': False,
     }
@@ -367,15 +367,17 @@ class execution(_Config):
     """A dictionary of BIDS selection filters."""
     boilerplate_only = False
     """Only generate a boilerplate."""
+    compress_svgs = True
+    """Compress reportlet SVGs to reduce report size (only viewable in a browser)."""
     copy_derivatives = False
     """Copy any found derivatives into the output directory."""
     sloppy = False
     """Run in sloppy mode (meaning, suboptimal parameters that minimize run-time)."""
-    dataset_links = {}
+    dataset_links: ty.ClassVar[dict] = {}
     """A dictionary of dataset links to be used to track Sources in sidecars."""
-    debug = []
+    debug: ty.ClassVar[list] = []
     """Debug mode(s)."""
-    derivatives = {}
+    derivatives: ty.ClassVar[dict] = {}
     """One or more paths where pre-computed derivatives are found."""
     derivatives_filters = None
     """A dictionary of BIDS selection filters"""
@@ -781,9 +783,7 @@ def get(flat=False):
         return settings
 
     return {
-        '.'.join((section, k)): v
-        for section, configs in settings.items()
-        for k, v in configs.items()
+        f'{section}.{k}': v for section, configs in settings.items() for k, v in configs.items()
     }
 
 

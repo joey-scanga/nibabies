@@ -107,10 +107,10 @@ def _build_parser():
         return int(digits) * scale[units[0]]
 
     def _drop_sub(value):
-        return value[4:] if value.startswith('sub-') else value
+        return value.removeprefix('sub-')
 
     def _drop_ses(value):
-        return value[4:] if value.startswith('ses-') else value
+        return value.removeprefix('ses-')
 
     def _process_value(value):
         import bids
@@ -376,6 +376,13 @@ NiBabies: Preprocessing workflows for infants v{config.environment.version}"""
         '--longitudinal',
         action='store_true',
         help='treat dataset as longitudinal - may increase runtime',
+    )
+    g_conf.add_argument(
+        '--compress-svgs',
+        action=BooleanOptionalAction,
+        default=True,
+        help='Compress reportlet SVGs to reduce report size (only viewable in a browser). '
+        'Use --no-compress-svgs to keep SVGs universally viewable.',
     )
     g_conf.add_argument(
         '--output-spaces',
@@ -896,7 +903,6 @@ applied."""
                 )
             case _:
                 config.loggers.cli.warning('Unknown output layout %s', output_layout)
-                pass
 
     nibabies_dir = config.execution.nibabies_dir
 
